@@ -1,53 +1,75 @@
-import requests
 import os
+import requests
+from tqdm import tqdm
 
-
+def nearest_lower_ten(n):
+    return n - (n % 10)
 
 class FABDEM:
 
+    @staticmethod
     def CreateURL(lat, lon):
-        # Exemplos de links para download de arquivos raster
-        # https://data.bris.ac.uk/datasets/s5hqmjcdj8yo2ibzi9b4ew3sn/N00E100-N10E110_FABDEM_V1-2.zip
-        # https://data.bris.ac.uk/datasets/s5hqmjcdj8yo2ibzi9b4ew3sn/N00E120-N10E130_FABDEM_V1-2.zip
         shortURL = 'https://data.bris.ac.uk/datasets/s5hqmjcdj8yo2ibzi9b4ew3sn/'
         
-        # Adiciona zeros à esquerda para manter o padrão de dígitos
-        # Caso a latitude ou longitude seja menor que 0, o link deve ser alterado para o padrão S ou W
-        # Exemplo: S30W050-S-20W040_FABDEM_V1-2.zip
-        # Gerar os limites de latitude e longitude somando mais 10
-
-        if lat < 0:
-            lat = abs(lat)
-            lat = f'S{lat:02}'
+        # Arredonda para a dezena inferior mais próxima
+        lat_lower = nearest_lower_ten(lat)
+        lon_lower = nearest_lower_ten(lon)
+        
+        if lat_lower < 0:
+            lat_str = f'S{abs(lat_lower):02d}'
+            lat_upper_str = f'S{abs(lat_lower + 10):02d}'
         else:
-            lat = f'N{lat:02}'
+            lat_str = f'N{lat_lower:02d}'
+            lat_upper_str = f'N{lat_lower + 10:02d}'
 
-        if lon < 0:
-            lon = abs(lon)
-            lon = f'W{lon:03}'
+        if lon_lower < 0:
+            lon_str = f'W{abs(lon_lower):03d}'
+            lon_upper_str = f'W{abs(lon_lower + 10):03d}'
         else:
-            lon = f'E{lon:03}'
+            lon_str = f'E{lon_lower:03d}'
+            lon_upper_str = f'E{lon_lower + 10:03d}'
 
-        URL = shortURL + f'{lat}{lon}-{lat + 10}{lon + 10}_FABDEM_V1-2.zip'
+        URL = f'{shortURL}{lat_str}{lon_str}-{lat_upper_str}{lon_upper_str}_FABDEM_V1-2.zip'
+
         print(URL)
         return URL
+
+
+
+def download_raster(URL):
+    if os.path.exists('FABDEM.zip'):
+        print('File already exists!')
+        return
+    
+    print('Downloading...')
+    response = requests.get(URL, stream=True)
+    total_size = int(response.headers.get('content-length', 0))
+    block_size = 1024  # 1 Kibibyte
+
+    with open('FABDEM.zip', 'wb') as file, tqdm(
+        desc='FABDEM.zip',
+        total=total_size,
+        unit='iB',
+        unit_scale=True,
+        unit_divisor=1024,
+    ) as bar:
+        for data in response.iter_content(block_size):
+            file.write(data)
+            bar.update(len(data))
+    
+    print('Downloaded!')
+
+# Abrir o arquivo zip e extrair o arquivo .tif da laltitude e longitude 
+# mais próxima do ponto de interesse
+# S027W049_FABDEM_V1-2.tif
+# S027W050_FABDEM_V1-2.tif
+# S028W050_FABDEM_V1-2.tif
+def extract_raster():
     
 
-def download_raster(lat, lon, path):
-    # Substitui pontos decimais por underscores
-    lat_str = str(lat).replace('.', '_')
-    lon_str = str(lon).replace('.', '_')
-    url = f'http://www.bristol.ac.uk/geography/research/pf/zips/{lat_str}_{lon_str}.zip'
-    response = requests.get(url)
-    response.raise_for_status()  # Verifica se a requisição foi bem-sucedida
-    os.makedirs(path, exist_ok=True)  # Cria o diretório se não existir
-    file_path = os.path.join(path, f'{lat_str}_{lon_str}.zip')
-    with open(file_path, 'wb') as f:
-        f.write(response.content)  # Escreve o conteúdo da resposta no arquivo
-    return file_path
 
+# Teste
 
-# S30W050-S-20W040_FABDEM_V1-2.zip
-# N-25E-42-N-15E-32_FABDEM_V1-2.zip
-
-FABDEM.CreateURL(-25, -42)
+# -27.5840,-48.6861
+URL_Raster = FABDEM.CreateURL(-27, -48)
+download_raster(URL_Raster)
